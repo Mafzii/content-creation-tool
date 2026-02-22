@@ -1,0 +1,25 @@
+CREATE TABLE IF NOT EXISTS topics (
+    id   BIGSERIAL PRIMARY KEY,
+    name TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS sources (
+    id   BIGSERIAL PRIMARY KEY,
+    name TEXT NOT NULL,
+    url  TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS styles (
+    id     BIGSERIAL PRIMARY KEY,
+    name   TEXT NOT NULL,
+    prompt TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS drafts (
+    id       BIGSERIAL PRIMARY KEY,
+    title    TEXT NOT NULL,
+    content  TEXT NOT NULL DEFAULT '',
+    topic_id BIGINT NOT NULL REFERENCES topics(id) ON DELETE RESTRICT,
+    style_id BIGINT NOT NULL REFERENCES styles(id) ON DELETE RESTRICT,
+    status   TEXT NOT NULL DEFAULT 'draft'
+);
