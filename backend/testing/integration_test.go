@@ -7,7 +7,7 @@ import (
 	"backend/internal/models"
 	"backend/internal/store"
 	"bytes"
-	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -15,76 +15,63 @@ import (
 	"os"
 	"testing"
 
-	"github.com/jackc/pgx/v5/pgxpool"
+	_ "modernc.org/sqlite"
 )
 
-var pool *pgxpool.Pool
-var schema string
+var testDB *sql.DB
 
 func TestMain(m *testing.M) {
-	dbURL := os.Getenv("INTEGRATION_TEST_DB_URL")
-	if dbURL == "" {
-		fmt.Println("INTEGRATION_TEST_DB_URL not set, skipping integration tests")
-		os.Exit(0)
-	}
-
-	ctx := context.Background()
-	schema = fmt.Sprintf("test_%d", os.Getpid())
-
 	var err error
-	pool, err = pgxpool.New(ctx, dbURL)
+	testDB, err = sql.Open("sqlite", ":memory:")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "connect: %v\n", err)
+		fmt.Fprintf(os.Stderr, "open sqlite: %v\n", err)
 		os.Exit(1)
 	}
 
-	setup := []string{
-		fmt.Sprintf("DROP SCHEMA IF EXISTS %s CASCADE", schema),
-		fmt.Sprintf("CREATE SCHEMA %s", schema),
-		fmt.Sprintf("SET search_path TO %s", schema),
-		`CREATE TABLE topics (
-			id SERIAL PRIMARY KEY,
-			name TEXT NOT NULL
-		)`,
-		`CREATE TABLE sources (
-			id SERIAL PRIMARY KEY,
-			name TEXT NOT NULL,
-			url  TEXT NOT NULL
-		)`,
-		`CREATE TABLE styles (
-			id     SERIAL PRIMARY KEY,
-			name   TEXT NOT NULL,
-			prompt TEXT NOT NULL
-		)`,
-		`CREATE TABLE drafts (
-			id       SERIAL PRIMARY KEY,
-			title    TEXT NOT NULL,
-			content  TEXT NOT NULL,
-			topic_id INT NOT NULL,
-			style_id INT NOT NULL,
-			status   TEXT NOT NULL
-		)`,
+	if _, err := testDB.Exec("PRAGMA foreign_keys=ON"); err != nil {
+		fmt.Fprintf(os.Stderr, "pragma: %v\n", err)
+		os.Exit(1)
 	}
-	for _, sql := range setup {
-		if _, err := pool.Exec(ctx, sql); err != nil {
-			fmt.Fprintf(os.Stderr, "setup %q: %v\n", sql, err)
-			os.Exit(1)
-		}
+
+	ddl := `
+CREATE TABLE topics (
+	id   INTEGER PRIMARY KEY AUTOINCREMENT,
+	name TEXT NOT NULL
+);
+CREATE TABLE sources (
+	id   INTEGER PRIMARY KEY AUTOINCREMENT,
+	name TEXT NOT NULL,
+	url  TEXT NOT NULL
+);
+CREATE TABLE styles (
+	id     INTEGER PRIMARY KEY AUTOINCREMENT,
+	name   TEXT NOT NULL,
+	prompt TEXT NOT NULL
+);
+CREATE TABLE drafts (
+	id       INTEGER PRIMARY KEY AUTOINCREMENT,
+	title    TEXT NOT NULL,
+	content  TEXT NOT NULL DEFAULT '',
+	topic_id INTEGER NOT NULL REFERENCES topics(id) ON DELETE RESTRICT,
+	style_id INTEGER NOT NULL REFERENCES styles(id) ON DELETE RESTRICT,
+	status   TEXT NOT NULL DEFAULT 'draft'
+);`
+	if _, err := testDB.Exec(ddl); err != nil {
+		fmt.Fprintf(os.Stderr, "migration: %v\n", err)
+		os.Exit(1)
 	}
 
 	code := m.Run()
 
-	pool.Exec(context.Background(), fmt.Sprintf("DROP SCHEMA IF EXISTS %s CASCADE", schema))
-	pool.Close()
+	testDB.Close()
 	os.Exit(code)
 }
 
-// setupMux wires up all routes the same way main.go does.
 func setupMux() *http.ServeMux {
-	topics := handlers.NewCrudHandler[models.Topic](store.NewTopicPostgresStore(pool))
-	sources := handlers.NewCrudHandler[models.Source](store.NewSourcePostgresStore(pool))
-	styles := handlers.NewCrudHandler[models.Style](store.NewStylePostgresStore(pool))
-	drafts := handlers.NewCrudHandler[models.Draft](store.NewDraftPostgresStore(pool))
+	topics := handlers.NewCrudHandler[models.Topic](store.NewTopicSQLiteStore(testDB))
+	sources := handlers.NewCrudHandler[models.Source](store.NewSourceSQLiteStore(testDB))
+	styles := handlers.NewCrudHandler[models.Style](store.NewStyleSQLiteStore(testDB))
+	drafts := handlers.NewCrudHandler[models.Draft](store.NewDraftSQLiteStore(testDB))
 
 	mux := http.NewServeMux()
 
@@ -277,11 +264,24 @@ func TestDraftsCRUD(t *testing.T) {
 	srv := httptest.NewServer(setupMux())
 	defer srv.Close()
 
+	// Create prerequisite topic and style first
+	topicBody, _ := json.Marshal(models.Topic{Name: "tech"})
+	resp, _ := http.Post(srv.URL+"/topics", "application/json", bytes.NewReader(topicBody))
+	var topic models.Topic
+	json.NewDecoder(resp.Body).Decode(&topic)
+	resp.Body.Close()
+
+	styleBody, _ := json.Marshal(models.Style{Name: "casual", Prompt: "be casual"})
+	resp, _ = http.Post(srv.URL+"/styles", "application/json", bytes.NewReader(styleBody))
+	var style models.Style
+	json.NewDecoder(resp.Body).Decode(&style)
+	resp.Body.Close()
+
 	body, _ := json.Marshal(models.Draft{
 		Title:   "draft1",
 		Content: "hello world",
-		TopicId: 1,
-		StyleId: 1,
+		TopicId: topic.Id,
+		StyleId: style.Id,
 		Status:  "pending",
 	})
 	resp, err := http.Post(srv.URL+"/drafts", "application/json", bytes.NewReader(body))
@@ -309,7 +309,7 @@ func TestDraftsCRUD(t *testing.T) {
 	}
 	resp.Body.Close()
 
-	// DELETE
+	// DELETE draft first, then style and topic
 	req, _ := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/drafts/%d", srv.URL, created.Id), nil)
 	resp, err = http.DefaultClient.Do(req)
 	if err != nil {

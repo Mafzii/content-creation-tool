@@ -5,25 +5,24 @@ import (
 	"backend/internal/db"
 	"backend/internal/handlers"
 	"backend/internal/store"
-	"context"
 	"log"
 	"net/http"
+	"os"
 )
 
 func main() {
 	cfg := config.Load()
 
-	ctx := context.Background()
-	pool, err := db.NewPool(ctx, cfg.DatabaseURL)
+	database, err := db.Open(cfg.DatabasePath)
 	if err != nil {
-		log.Fatalf("failed to connect to database: %v", err)
+		log.Fatalf("failed to open database: %v", err)
 	}
-	defer pool.Close()
+	defer database.Close()
 
-	topicStore := store.NewTopicPostgresStore(pool)
-	sourceStore := store.NewSourcePostgresStore(pool)
-	styleStore := store.NewStylePostgresStore(pool)
-	draftStore := store.NewDraftPostgresStore(pool)
+	topicStore := store.NewTopicSQLiteStore(database)
+	sourceStore := store.NewSourceSQLiteStore(database)
+	styleStore := store.NewStyleSQLiteStore(database)
+	draftStore := store.NewDraftSQLiteStore(database)
 
 	topics := handlers.NewCrudHandler(topicStore)
 	sources := handlers.NewCrudHandler(sourceStore)
@@ -51,6 +50,12 @@ func main() {
 	mux.HandleFunc("GET /drafts/{id}", drafts.Get)
 	mux.HandleFunc("POST /drafts", drafts.Create)
 	mux.HandleFunc("DELETE /drafts/{id}", drafts.Delete)
+
+	frontendDir := "../frontend"
+	if dir := os.Getenv("FRONTEND_DIR"); dir != "" {
+		frontendDir = dir
+	}
+	mux.Handle("/", http.FileServer(http.Dir(frontendDir)))
 
 	log.Printf("server starting on :%s", cfg.Port)
 	log.Fatal(http.ListenAndServe(":"+cfg.Port, mux))

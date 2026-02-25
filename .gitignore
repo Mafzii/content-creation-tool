@@ -3,6 +3,7 @@
 
 # Go
 backend/tmp/
+backend/data/*.db
 
 # Node / Frontend
 # frontend/node_modules/

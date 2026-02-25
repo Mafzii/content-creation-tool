@@ -7,8 +7,8 @@ import (
 )
 
 type Config struct {
-	DatabaseURL string
-	Port        string
+	DatabasePath string
+	Port         string
 }
 
 func Load() Config {
@@ -19,8 +19,13 @@ func Load() Config {
 		port = "8080"
 	}
 
+	dbPath := os.Getenv("DATABASE_PATH")
+	if dbPath == "" {
+		dbPath = "data/app.db"
+	}
+
 	return Config{
-		DatabaseURL: os.Getenv("DATABASE_URL"),
-		Port:        port,
+		DatabasePath: dbPath,
+		Port:         port,
 	}
 }
