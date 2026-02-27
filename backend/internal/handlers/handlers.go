@@ -11,6 +11,7 @@ type Store[T any] interface {
 	GetAll() ([]T, error)
 	Get(id int) (T, error)
 	Create(item T) (T, error)
+	Update(id int, item T) (T, error)
 	Delete(id int) error
 }
 
@@ -66,6 +67,29 @@ func (h *CrudHandler[T]) Create(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(created)
+}
+
+func (h *CrudHandler[T]) Update(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	var item T
+	if err := json.NewDecoder(r.Body).Decode(&item); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	updated, err := h.store.Update(id, item)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(updated)
 }
 
 func (h *CrudHandler[T]) Delete(w http.ResponseWriter, r *http.Request) {

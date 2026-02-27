@@ -15,8 +15,10 @@ type SQLiteStoreConfig[T models.Identifiable] struct {
 	Table      string
 	SelectSQL  string
 	InsertSQL  string
+	UpdateSQL  string
 	Scan       func(sc Scanner) (T, error)
 	InsertArgs func(item T) []any
+	UpdateArgs func(item T) []any
 }
 
 type SQLiteStore[T models.Identifiable] struct {
@@ -76,6 +78,16 @@ func (s *SQLiteStore[T]) Create(item T) (T, error) {
 		return zero, err
 	}
 	return created, nil
+}
+
+func (s *SQLiteStore[T]) Update(id int, item T) (T, error) {
+	args := append(s.config.UpdateArgs(item), id)
+	_, err := s.db.ExecContext(context.Background(), s.config.UpdateSQL+" WHERE id = ?", args...)
+	if err != nil {
+		var zero T
+		return zero, err
+	}
+	return s.Get(id)
 }
 
 func (s *SQLiteStore[T]) Delete(id int) error {
