@@ -32,7 +32,8 @@ func main() {
 	settingsStore := store.NewSettingsStore(database)
 
 	topics := handlers.NewCrudHandler(topicStore)
-	sources := handlers.NewCrudHandler(sourceStore)
+	sourceCrud := handlers.NewCrudHandler(sourceStore)
+	sourceHandler := handlers.NewSourceHandler(sourceStore)
 	styles := handlers.NewCrudHandler(styleStore)
 	drafts := handlers.NewCrudHandler(draftStore)
 	settingsHandler := handlers.NewSettingsHandler(settingsStore)
@@ -46,11 +47,13 @@ func main() {
 	mux.HandleFunc("PUT /topics/{id}", topics.Update)
 	mux.HandleFunc("DELETE /topics/{id}", topics.Delete)
 
-	mux.HandleFunc("GET /sources", sources.GetAll)
-	mux.HandleFunc("GET /sources/{id}", sources.Get)
-	mux.HandleFunc("POST /sources", sources.Create)
-	mux.HandleFunc("PUT /sources/{id}", sources.Update)
-	mux.HandleFunc("DELETE /sources/{id}", sources.Delete)
+	mux.HandleFunc("GET /sources", sourceCrud.GetAll)
+	mux.HandleFunc("GET /sources/{id}", sourceCrud.Get)
+	mux.HandleFunc("POST /sources", sourceHandler.Create)
+	mux.HandleFunc("PUT /sources/{id}", sourceCrud.Update)
+	mux.HandleFunc("DELETE /sources/{id}", sourceCrud.Delete)
+	mux.HandleFunc("POST /sources/{id}/fetch", sourceHandler.Fetch)
+	mux.HandleFunc("GET /sources/{id}/status", sourceHandler.Status)
 
 	mux.HandleFunc("GET /styles", styles.GetAll)
 	mux.HandleFunc("GET /styles/{id}", styles.Get)
