@@ -1,5 +1,6 @@
 # Environment
 .env
+.env.*
 
 # Go binaries
 backend/main
@@ -9,10 +10,11 @@ backend/server
 backend/data/*
 !backend/data/.gitkeep
 
-# Node / Frontend
-# frontend/node_modules/
-# frontend/dist/
-# frontend/.next/
+# Python
+__pycache__/
+.venv/
+dist/
+build/
 
 # OS
 .DS_Store
