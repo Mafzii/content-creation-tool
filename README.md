@@ -40,6 +40,36 @@ Configure your provider in the **Settings** tab after launching. Paste your API 
 3. **Styles** — Define a writing style with a tone and prompt.
 4. **Drafts** — Pick a topic, style, and sources, then click **Generate 3 Drafts** to get variants. Tweak a selected variant in the modal, then use it as your draft content.
 
+## MCP Server
+
+The `mcp/` directory contains a Model Context Protocol server that wraps the REST API, letting AI assistants (like Claude Code) manage topics, sources, styles, and drafts directly through tool calls.
+
+**Prerequisites:** [uv](https://docs.astral.sh/uv/) (Python package manager)
+
+```bash
+cd mcp
+uv sync
+```
+
+The server runs over stdio and is configured via `.mcp.json` at the project root. To use it with Claude Code, the backend must be running first.
+
+| Variable | Default | Description |
+|---|---|---|
+| `CONTENT_TOOL_URL` | `http://localhost:8080` | Backend API base URL |
+
+### Available Tools
+
+| Tool | Description |
+|---|---|
+| `list/create/update/delete_topic` | Manage content topics |
+| `list/create/update/delete_source` | Manage reference sources (text or URL) |
+| `refetch_source` | Re-fetch content for a URL source |
+| `list/create/update/delete_style` | Manage writing styles |
+| `list/create/update/delete_draft` | Manage drafts |
+| `generate_drafts` | Generate 3 draft variants from a topic + style |
+| `tweak_draft` | Revise content with a natural language instruction |
+| `get/save_settings` | Configure LLM provider, model, and API key |
+
 ## Project Structure
 
 ```
@@ -55,4 +85,10 @@ backend/
   migrations/     # SQL migration files
 frontend/
   index.html      # Single-file SPA
+  style.css       # Styles
+  js/             # Modular JS (app, tabs, forms, api, etc.)
+mcp/
+  content_tool_mcp.py  # MCP server (FastMCP + httpx)
+  pyproject.toml       # Python project config
+  uv.lock              # Dependency lockfile
 ```

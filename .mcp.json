@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "content-tool": {
+      "command": "uv",
+      "args": ["run", "content_tool_mcp.py"],
+      "cwd": "/Users/mustafaafzal/projects/content-creation-tool/mcp",
+      "env": {
+        "CONTENT_TOOL_URL": "http://localhost:8080"
+      }
+    }
+  }
+}
