@@ -7,7 +7,6 @@ export function initTabs(tabLoaders) {
     btn.classList.add('active');
     const panel = document.getElementById(`tab-${btn.dataset.tab}`);
     panel.classList.add('active');
-    if (btn.dataset.tab === 'settings') panel.style.display = 'block';
     tabLoaders[btn.dataset.tab]();
   });
 }
