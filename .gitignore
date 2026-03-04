@@ -1,9 +1,13 @@
 # Environment
 .env
 
-# Go
-backend/tmp/
-backend/data/*.db
+# Go binaries
+backend/main
+backend/server
+
+# Database
+backend/data/*
+!backend/data/.gitkeep
 
 # Node / Frontend
 # frontend/node_modules/
