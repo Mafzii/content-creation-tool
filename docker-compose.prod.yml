@@ -1,0 +1,42 @@
+# docker-compose.prod.yml  — production / server deployment
+#
+# Extends docker-compose.yml with production-hardened settings.
+#
+# Usage on your server:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Or with the helper script:
+#   ./scripts/deploy.sh
+
+services:
+  app:
+    image: "${DOCKER_IMAGE:-content-creation-tool:latest}"
+    # Override build so prod always uses the pre-built image
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      # Bind only to Tailscale interface (tailscale0) or 0.0.0.0 if using a
+      # reverse proxy.  Default keeps it reachable on every interface so
+      # Tailscale can route to it without extra config.
+      - "${HOST_IP:-0.0.0.0}:${PORT:-8080}:8080"
+    environment:
+      PORT: "8080"
+      DATABASE_PATH: /app/data/app.db
+      FRONTEND_DIR: /app/frontend
+    volumes:
+      - app_data:/app/data
+    env_file:
+      - path: ./backend/.env
+        required: false
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+volumes:
+  app_data:
+    # Use a named volume so data survives container recreation
+    name: content_creation_tool_data

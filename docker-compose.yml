@@ -1,0 +1,30 @@
+# docker-compose.yml  — local development
+#
+# Usage:
+#   docker compose up --build
+#
+# The backend watches for a local .env file in the backend/ directory.
+# Mount your local source so you can rebuild quickly with:
+#   docker compose up --build
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "${PORT:-8080}:8080"
+    environment:
+      PORT: "${PORT:-8080}"
+      DATABASE_PATH: /app/data/app.db
+      FRONTEND_DIR: /app/frontend
+    volumes:
+      # Persist the SQLite database across restarts
+      - app_data:/app/data
+    env_file:
+      - path: ./backend/.env
+        required: false
+    restart: unless-stopped
+
+volumes:
+  app_data:
