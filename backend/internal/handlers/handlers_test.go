@@ -57,11 +57,27 @@ func (s *stubStore[T]) Delete(id int) error {
 	return errors.New("not found")
 }
 
+func (s *stubStore[T]) Update(id int, item T) (T, error) {
+	if s.err != nil {
+		var zero T
+		return zero, s.err
+	}
+	for i, existing := range s.items {
+		if existing.GetId() == id {
+			s.items[i] = item
+			return item, nil
+		}
+	}
+	var zero T
+	return zero, errors.New("not found")
+}
+
 type crudIface interface {
 	GetAll(http.ResponseWriter, *http.Request)
 	Get(http.ResponseWriter, *http.Request)
 	Create(http.ResponseWriter, *http.Request)
 	Delete(http.ResponseWriter, *http.Request)
+	Update(http.ResponseWriter, *http.Request)
 }
 
 func newTopicHandler(items []models.Topic, err error) crudIface {
