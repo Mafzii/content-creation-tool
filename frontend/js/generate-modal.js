@@ -1,5 +1,5 @@
 import { apiFetch } from './api.js';
-import { showNotice, clearNotice } from './ui.js';
+import { showNotice, clearNotice, renderMarkdown } from './ui.js';
 import * as state from './state.js';
 
 function openGenerateModal() {
@@ -9,6 +9,14 @@ function openGenerateModal() {
 
 function closeGenerateModal() {
   document.getElementById('modal-generate').classList.remove('open');
+}
+
+function timeAgo(ts) {
+  const diff = Math.floor((Date.now() - ts) / 1000);
+  if (diff < 60) return 'just now';
+  if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+  if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+  return Math.floor(diff / 86400) + 'd ago';
 }
 
 function renderVariantsInModal() {
@@ -45,8 +53,8 @@ function renderVariantsInModal() {
     expandBtn.type = 'button';
 
     const preview = document.createElement('div');
-    preview.className = 'variant-preview collapsed';
-    preview.textContent = text;
+    preview.className = 'variant-preview md-content collapsed';
+    preview.innerHTML = renderMarkdown(text);
 
     expandBtn.addEventListener('click', e => {
       e.stopPropagation();
@@ -64,6 +72,72 @@ function renderVariantsInModal() {
     header.appendChild(expandBtn);
     card.appendChild(header);
     card.appendChild(preview);
+
+    // Version history
+    const history = state.variantHistory[i];
+    if (history && history.length > 1) {
+      const historyWrap = document.createElement('div');
+      historyWrap.className = 'version-history';
+
+      const toggleBtn = document.createElement('button');
+      toggleBtn.className = 'version-toggle';
+      toggleBtn.type = 'button';
+      toggleBtn.textContent = `${history.length} versions`;
+
+      const list = document.createElement('div');
+      list.className = 'version-list';
+      list.style.display = 'none';
+
+      toggleBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        const hidden = list.style.display === 'none';
+        list.style.display = hidden ? 'block' : 'none';
+        toggleBtn.textContent = hidden
+          ? `${history.length} versions (hide)`
+          : `${history.length} versions`;
+      });
+
+      history.forEach((entry, hi) => {
+        const item = document.createElement('div');
+        item.className = 'version-item';
+
+        const label = document.createElement('span');
+        label.className = 'version-label';
+        label.textContent = `v${hi + 1}: ${entry.label}`;
+
+        const time = document.createElement('span');
+        time.className = 'version-time';
+        time.textContent = timeAgo(entry.timestamp);
+
+        item.appendChild(label);
+        item.appendChild(time);
+
+        if (hi === history.length - 1) {
+          const tag = document.createElement('span');
+          tag.className = 'version-current-tag';
+          tag.textContent = 'current';
+          item.appendChild(tag);
+        } else {
+          const restoreBtn = document.createElement('button');
+          restoreBtn.className = 'version-revert';
+          restoreBtn.type = 'button';
+          restoreBtn.textContent = 'restore';
+          restoreBtn.addEventListener('click', ev => {
+            ev.stopPropagation();
+            state.revertVariant(i, hi);
+            renderVariantsInModal();
+          });
+          item.appendChild(restoreBtn);
+        }
+
+        list.appendChild(item);
+      });
+
+      historyWrap.appendChild(toggleBtn);
+      historyWrap.appendChild(list);
+      card.appendChild(historyWrap);
+    }
+
     container.appendChild(card);
   });
 }
@@ -100,6 +174,13 @@ export function initGenerateModal() {
       });
       state.setVariantTexts(data.variants || ['', '', '']);
       state.setSelectedVariantIdx(0);
+
+      // Initialize version history
+      state.resetVariantHistory();
+      state.variantTexts.forEach((text, idx) => {
+        state.pushVariantVersion(idx, text, 'Original');
+      });
+
       openGenerateModal();
     } catch (err) {
       showNotice('drafts', 'Generation failed: ' + err.message);
@@ -131,6 +212,11 @@ export function initGenerateModal() {
         body: JSON.stringify({ content, instruction })
       });
       state.variantTexts[state.selectedVariantIdx] = data.content;
+
+      // Push to version history
+      const label = instruction.length > 40 ? instruction.slice(0, 40) + '…' : instruction;
+      state.pushVariantVersion(state.selectedVariantIdx, data.content, label);
+
       renderVariantsInModal();
       document.getElementById('modal-tweak-instruction').value = '';
     } catch (err) {

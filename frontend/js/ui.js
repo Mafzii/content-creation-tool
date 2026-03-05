@@ -10,6 +10,13 @@ export function clearNotice(tab) {
   el.className = 'notice'; el.textContent = '';
 }
 
+export function renderMarkdown(text) {
+  if (typeof marked !== 'undefined' && typeof DOMPurify !== 'undefined') {
+    return DOMPurify.sanitize(marked.parse(text || ''));
+  }
+  return `<pre style="white-space:pre-wrap">${(text || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</pre>`;
+}
+
 export function esc(str) {
   return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }

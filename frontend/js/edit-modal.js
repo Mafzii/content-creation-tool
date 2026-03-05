@@ -1,5 +1,5 @@
 import { apiFetch } from './api.js';
-import { esc } from './ui.js';
+import { esc, renderMarkdown } from './ui.js';
 import { topicsCache, stylesCache, sourcesCache } from './state.js';
 
 let loaders = {};
@@ -30,6 +30,26 @@ export function openEditModal(entity, item) {
 
   const fieldsEl = document.getElementById('modal-edit-fields');
   fieldsEl.innerHTML = renderEditFields(entity, item);
+
+  // Wire up Write/Preview tabs for drafts
+  if (entity === 'drafts') {
+    fieldsEl.querySelectorAll('.editor-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        fieldsEl.querySelectorAll('.editor-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        const writePane = fieldsEl.querySelector('.editor-write');
+        const previewPane = fieldsEl.querySelector('.editor-preview');
+        if (tab.dataset.target === 'preview') {
+          writePane.style.display = 'none';
+          previewPane.style.display = 'block';
+          previewPane.innerHTML = renderMarkdown(fieldsEl.querySelector('#ef-content').value);
+        } else {
+          writePane.style.display = 'block';
+          previewPane.style.display = 'none';
+        }
+      });
+    });
+  }
 
   const saveBtn = document.getElementById('modal-edit-save');
   saveBtn.onclick = async () => {
@@ -85,7 +105,14 @@ function renderEditFields(entity, item) {
       field('Style', `<select id="ef-style_id"><option value="">— select —</option>${styleOpts}</select>`) +
       field('Sources', `<div class="checkbox-list" id="ef-sources">${sourceChecks || '<div style="padding:0.6rem 0.75rem;font-size:0.78rem;color:var(--muted)">No sources.</div>'}</div>`) +
       field('Notes', `<textarea id="ef-notes" style="min-height:60px">${esc(item.notes)}</textarea>`) +
-      field('Content', `<textarea id="ef-content" style="min-height:120px">${esc(item.content)}</textarea>`) +
+      `<div class="field"><label>Content</label>
+        <div class="editor-tabs">
+          <button type="button" class="editor-tab active" data-target="write">Write</button>
+          <button type="button" class="editor-tab" data-target="preview">Preview</button>
+        </div>
+        <div class="editor-write"><textarea id="ef-content" style="min-height:120px">${esc(item.content)}</textarea></div>
+        <div class="editor-preview md-content" style="display:none"></div>
+      </div>` +
       field('Status', `<select id="ef-status"><option value="draft"${item.status==='draft'?' selected':''}>draft</option><option value="published"${item.status==='published'?' selected':''}>published</option></select>`);
   }
   return '';
