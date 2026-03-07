@@ -72,6 +72,19 @@
           <label>Cleaned text <span style="font-size:0.68rem;color:var(--muted)">(optional override)</span></label>
           <textarea name="content" placeholder="Leave blank to use text above…" style="min-height:60px"></textarea>
         </div>
+        <div class="field" id="source-extract-mode-field" style="display:none">
+          <label>Extract Mode</label>
+          <div class="radio-group">
+            <label class="radio-label"><input type="radio" name="extract_mode" value="standard" checked> Standard</label>
+            <label class="radio-label"><input type="radio" name="extract_mode" value="ai"> AI Extract</label>
+          </div>
+        </div>
+        <div class="field" id="source-topic-field" style="display:none">
+          <label>Topic Context <span style="font-size:0.68rem;color:var(--muted)">(optional)</span></label>
+          <select name="source_topic_id" id="source-topic-select">
+            <option value="0">-- none --</option>
+          </select>
+        </div>
         <div id="source-fetch-status" style="display:none; margin-bottom:1rem; font-size:0.82rem; color:var(--muted)"></div>
         <button type="submit" class="submit-btn" id="source-submit-btn">Create Source</button>
       </form>

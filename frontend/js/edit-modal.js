@@ -82,11 +82,13 @@ function renderEditFields(entity, item) {
       field('Keywords', `<input type="text" id="ef-keywords" value="${esc(item.keywords)}">`);
   }
   if (entity === 'sources') {
+    const extractMode = item.extract_mode || 'standard';
     return field('Name', `<input type="text" id="ef-name" value="${esc(item.name)}" required>`) +
       field('Type', `<select id="ef-type"><option value="text"${item.type==='text'?' selected':''}>Text</option><option value="url"${item.type==='url'?' selected':''}>URL</option><option value="file"${item.type==='file'?' selected':''}>File</option></select>`) +
       field('Raw', `<textarea id="ef-raw" style="min-height:80px">${esc(item.raw)}</textarea>`) +
       field('Content', `<textarea id="ef-content" style="min-height:80px">${esc(item.content)}</textarea>`) +
-      field('Status', `<select id="ef-status"><option value="ready"${item.status==='ready'?' selected':''}>ready</option><option value="pending"${item.status==='pending'?' selected':''}>pending</option><option value="error"${item.status==='error'?' selected':''}>error</option></select>`);
+      field('Extract Mode', `<select id="ef-extract_mode"><option value="standard"${extractMode==='standard'?' selected':''}>Standard</option><option value="ai"${extractMode==='ai'?' selected':''}>AI Extract</option></select>`) +
+      field('Status', `<select id="ef-status"><option value="ready"${item.status==='ready'?' selected':''}>ready</option><option value="pending"${item.status==='pending'?' selected':''}>pending</option><option value="partial"${item.status==='partial'?' selected':''}>partial</option><option value="error"${item.status==='error'?' selected':''}>error</option></select>`);
   }
   if (entity === 'styles') {
     return field('Name', `<input type="text" id="ef-name" value="${esc(item.name)}" required>`) +
@@ -121,7 +123,7 @@ function renderEditFields(entity, item) {
 function collectEditBody(entity, fieldsEl, item) {
   const v = id => { const el = fieldsEl.querySelector('#' + id); return el ? el.value : ''; };
   if (entity === 'topics') return { name: v('ef-name'), description: v('ef-description'), keywords: v('ef-keywords') };
-  if (entity === 'sources') return { name: v('ef-name'), type: v('ef-type'), raw: v('ef-raw'), content: v('ef-content'), status: v('ef-status') };
+  if (entity === 'sources') return { name: v('ef-name'), type: v('ef-type'), raw: v('ef-raw'), content: v('ef-content'), extract_mode: v('ef-extract_mode') || 'standard', topic_id: item.topic_id || 0, status: v('ef-status') };
   if (entity === 'styles') return { name: v('ef-name'), tone: v('ef-tone'), prompt: v('ef-prompt'), example: v('ef-example') };
   if (entity === 'drafts') {
     const srcIds = [...fieldsEl.querySelectorAll('input[name="source_ids"]:checked')].map(cb => parseInt(cb.value, 10));

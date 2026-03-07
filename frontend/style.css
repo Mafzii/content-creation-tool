@@ -115,6 +115,7 @@ main { max-width: 1100px; margin: 0 auto; padding: 2.5rem 2rem; }
 .item-badge.published { background: #e7f0e8; color: #2d7a35; }
 .item-badge.ready { background: #e7f0e8; color: #2d7a35; }
 .item-badge.pending { background: #fff8e7; color: #9a6800; }
+.item-badge.partial { background: #fff3e0; color: #b45309; }
 .item-badge.error { background: var(--accent-dim); color: var(--accent); }
 .delete-btn {
   background: none;
@@ -417,6 +418,24 @@ input[type="file"] {
 
 /* ── Settings tab ── */
 .settings-layout { max-width: 480px; }
+
+/* ── Radio group ── */
+.radio-group {
+  display: flex;
+  gap: 1.25rem;
+}
+.radio-label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.82rem;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--ink);
+  cursor: pointer;
+  margin: 0;
+}
+.radio-label input[type="radio"] { width: auto; }
 
 @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 

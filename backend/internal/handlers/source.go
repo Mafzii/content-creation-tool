@@ -4,11 +4,17 @@ import (
 	"backend/internal/fileutil"
 	"backend/internal/models"
 	"backend/internal/scraper"
+	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
 )
+
+const extractionPrompt = `Extract and summarize the key information from this content. Focus on facts, data, quotes, and arguments. Remove boilerplate and irrelevant content. Return a clean, well-structured summary.`
+
+const topicExtractionPrompt = `Extract and summarize the key information from this content that is relevant to "%s". %sFocus on facts, data, quotes, and arguments related to this subject. Remove boilerplate and irrelevant content. Return a clean, well-structured summary.`
 
 type SourceStore interface {
 	GetAll() ([]models.Source, error)
@@ -19,11 +25,13 @@ type SourceStore interface {
 }
 
 type SourceHandler struct {
-	store SourceStore
+	store    SourceStore
+	settings settingsStoreIface
+	topics   topicStoreIface
 }
 
-func NewSourceHandler(store SourceStore) *SourceHandler {
-	return &SourceHandler{store: store}
+func NewSourceHandler(store SourceStore, settings settingsStoreIface, topics topicStoreIface) *SourceHandler {
+	return &SourceHandler{store: store, settings: settings, topics: topics}
 }
 
 // Create handles POST /sources with type-specific logic.
@@ -65,6 +73,10 @@ func (h *SourceHandler) Create(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if src.ExtractMode == "" {
+		src.ExtractMode = "standard"
+	}
+
 	switch src.Type {
 	case "url":
 		src.Status = "pending"
@@ -77,7 +89,7 @@ func (h *SourceHandler) Create(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		// Kick off background fetch
-		go h.fetchURLContent(created.Id, src.Raw)
+		go h.fetchURLContent(created.Id, src.Raw, src.ExtractMode, src.TopicId)
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
@@ -132,7 +144,7 @@ func (h *SourceHandler) Fetch(w http.ResponseWriter, r *http.Request) {
 	h.store.Update(id, src)
 
 	// Kick off background fetch
-	go h.fetchURLContent(id, src.Raw)
+	go h.fetchURLContent(id, src.Raw, src.ExtractMode, src.TopicId)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"status": "pending"})
@@ -156,8 +168,8 @@ func (h *SourceHandler) Status(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{"status": src.Status})
 }
 
-func (h *SourceHandler) fetchURLContent(id int, url string) {
-	title, content, err := scraper.FetchURL(url)
+func (h *SourceHandler) fetchURLContent(id int, url, extractMode string, topicId int) {
+	title, rawContent, err := scraper.FetchURL(url)
 	if err != nil {
 		slog.Error("failed to fetch URL", "id", id, "url", url, "error", err)
 		src, getErr := h.store.Get(id)
@@ -173,11 +185,50 @@ func (h *SourceHandler) fetchURLContent(id int, url string) {
 	if err != nil {
 		return
 	}
+
+	content := rawContent
+	status := "ready"
+
+	if extractMode == "ai" {
+		aiContent, aiErr := h.aiExtract(rawContent, topicId)
+		if aiErr != nil {
+			slog.Error("AI extraction failed, falling back to raw content", "id", id, "error", aiErr)
+			status = "partial"
+		} else {
+			content = aiContent
+		}
+	}
+
 	src.Content = content
-	src.Status = "ready"
+	src.Status = status
 	if src.Name == "" && title != "" {
 		src.Name = title
 	}
 	h.store.Update(id, src)
-	slog.Info("fetched URL content", "id", id, "url", url, "content_length", len(content))
+	slog.Info("fetched URL content", "id", id, "url", url, "extract_mode", extractMode, "status", status, "content_length", len(content))
+}
+
+func (h *SourceHandler) aiExtract(rawContent string, topicId int) (string, error) {
+	client, err := BuildLLMClient(h.settings)
+	if err != nil {
+		return "", fmt.Errorf("build LLM client: %w", err)
+	}
+
+	prompt := extractionPrompt
+	if topicId > 0 {
+		topic, err := h.topics.Get(topicId)
+		if err == nil {
+			keywords := ""
+			if topic.Keywords != "" {
+				keywords = fmt.Sprintf("Focus on these keywords: %s. ", topic.Keywords)
+			}
+			prompt = fmt.Sprintf(topicExtractionPrompt, topic.Name, keywords)
+		}
+	}
+
+	result, err := client.Tweak(context.Background(), rawContent, prompt)
+	if err != nil {
+		return "", fmt.Errorf("LLM tweak: %w", err)
+	}
+	return result, nil
 }

@@ -14,12 +14,14 @@ type Topic struct {
 func (t Topic) GetId() int { return t.Id }
 
 type Source struct {
-	Id      int    `json:"id"`
-	Name    string `json:"name"`
-	Type    string `json:"type"`    // text|url|file
-	Raw     string `json:"raw"`     // original input
-	Content string `json:"content"` // cleaned text for LLM
-	Status  string `json:"status"`  // ready|pending
+	Id          int    `json:"id"`
+	Name        string `json:"name"`
+	Type        string `json:"type"`         // text|url|file
+	Raw         string `json:"raw"`          // original input
+	Content     string `json:"content"`      // cleaned text for LLM
+	Status      string `json:"status"`       // ready|pending|partial|error
+	ExtractMode string `json:"extract_mode"` // standard|ai
+	TopicId     int    `json:"topic_id"`     // optional topic for AI extraction context
 }
 
 func (s Source) GetId() int { return s.Id }

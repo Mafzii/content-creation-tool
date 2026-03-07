@@ -29,12 +29,12 @@ func NewTopicSQLiteStore(db *sql.DB) *SQLiteStore[models.Topic] {
 func NewSourceSQLiteStore(db *sql.DB) *SQLiteStore[models.Source] {
 	return NewSQLiteStore(db, SQLiteStoreConfig[models.Source]{
 		Table:     "sources",
-		SelectSQL: "SELECT id, name, type, raw, content, status FROM sources",
-		InsertSQL: "INSERT INTO sources (name, url, type, raw, content, status) VALUES (?, '', ?, ?, ?, ?)",
-		UpdateSQL: "UPDATE sources SET name=?, type=?, raw=?, content=?, status=?",
+		SelectSQL: "SELECT id, name, type, raw, content, status, extract_mode, topic_id FROM sources",
+		InsertSQL: "INSERT INTO sources (name, url, type, raw, content, status, extract_mode, topic_id) VALUES (?, '', ?, ?, ?, ?, ?, ?)",
+		UpdateSQL: "UPDATE sources SET name=?, type=?, raw=?, content=?, status=?, extract_mode=?, topic_id=?",
 		Scan: func(sc Scanner) (models.Source, error) {
 			var s models.Source
-			err := sc.Scan(&s.Id, &s.Name, &s.Type, &s.Raw, &s.Content, &s.Status)
+			err := sc.Scan(&s.Id, &s.Name, &s.Type, &s.Raw, &s.Content, &s.Status, &s.ExtractMode, &s.TopicId)
 			return s, err
 		},
 		InsertArgs: func(s models.Source) []any {
@@ -46,7 +46,11 @@ func NewSourceSQLiteStore(db *sql.DB) *SQLiteStore[models.Source] {
 			if status == "" {
 				status = "ready"
 			}
-			return []any{s.Name, typ, s.Raw, s.Content, status}
+			extractMode := s.ExtractMode
+			if extractMode == "" {
+				extractMode = "standard"
+			}
+			return []any{s.Name, typ, s.Raw, s.Content, status, extractMode, s.TopicId}
 		},
 		UpdateArgs: func(s models.Source) []any {
 			typ := s.Type
@@ -57,7 +61,11 @@ func NewSourceSQLiteStore(db *sql.DB) *SQLiteStore[models.Source] {
 			if status == "" {
 				status = "ready"
 			}
-			return []any{s.Name, typ, s.Raw, s.Content, status}
+			extractMode := s.ExtractMode
+			if extractMode == "" {
+				extractMode = "standard"
+			}
+			return []any{s.Name, typ, s.Raw, s.Content, status, extractMode, s.TopicId}
 		},
 	})
 }

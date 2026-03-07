@@ -33,7 +33,7 @@ func main() {
 
 	topics := handlers.NewCrudHandler(topicStore)
 	sourceCrud := handlers.NewCrudHandler(sourceStore)
-	sourceHandler := handlers.NewSourceHandler(sourceStore)
+	sourceHandler := handlers.NewSourceHandler(sourceStore, settingsStore, topicStore)
 	styles := handlers.NewCrudHandler(styleStore)
 	drafts := handlers.NewCrudHandler(draftStore)
 	settingsHandler := handlers.NewSettingsHandler(settingsStore)
