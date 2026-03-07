@@ -70,70 +70,17 @@ The server runs over stdio and is configured via `.mcp.json` at the project root
 | `tweak_draft` | Revise content with a natural language instruction |
 | `get/save_settings` | Configure LLM provider, model, and API key |
 
-## Deploying to Your Server (Tailscale + CI/CD)
-
-This section explains how to run the tool on a home server or VPS and access it from your phone — even when you're away from home — using [Tailscale](https://tailscale.com).
-
-### Prerequisites
-
-| Tool | Why |
-|---|---|
-| [Docker](https://docs.docker.com/engine/install/) + [Docker Compose v2](https://docs.docker.com/compose/install/) | Container runtime |
-| [Tailscale](https://tailscale.com/download) | Secure overlay network (phone ↔ server) |
-| Git | Code checkout on the server |
-
-### 1 — One-time server setup
+## Running with Docker
 
 ```bash
-# On your server
-git clone https://github.com/Mafzii/content-creation-tool.git
-cd content-creation-tool
-
-# Create a backend/.env from the template (edit values as needed)
+# Create a local .env from the template
 cp .env.example backend/.env
 
-# Start the stack
-./scripts/deploy.sh
+# Build and start
+docker compose up --build
 ```
 
-The app will be available at `http://<server-tailscale-ip>:8080` from any device on your Tailscale network.
-
-> **Tip:** Enable [MagicDNS](https://tailscale.com/kb/1081/magicdns) in your Tailscale admin so you can reach the server by name (e.g. `http://myserver:8080`) instead of an IP.
-
-### 2 — Automated deploys via GitHub Actions (CI/CD)
-
-Every push to `main` automatically deploys to your server. Add these secrets in **GitHub → Settings → Secrets → Actions**:
-
-| Secret | Description |
-|---|---|
-| `DEPLOY_HOST` | Tailscale IP or MagicDNS hostname of your server |
-| `DEPLOY_USER` | SSH username on the server |
-| `DEPLOY_SSH_KEY` | Private SSH key (the server must have the public key in `~/.ssh/authorized_keys`) |
-| `DEPLOY_PORT` | SSH port (default `22`) |
-| `DEPLOY_PATH` | Absolute path to the cloned repo on the server (default `~/content-creation-tool`) |
-
-**Workflow:**
-1. You push a commit (from your laptop, phone via GitHub, or any editor).
-2. GitHub Actions runs tests → builds the Docker image → SSHes into your server → pulls & restarts the container.
-3. Open the app on your phone; the new version is live.
-
-### 3 — Managing the running stack
-
-```bash
-# On the server
-./scripts/deploy.sh          # pull latest & restart
-./scripts/deploy.sh logs     # follow live logs
-./scripts/deploy.sh status   # show container status
-./scripts/deploy.sh stop     # shut everything down
-```
-
-### 4 — Accessing the app on your phone
-
-1. Install [Tailscale](https://tailscale.com/download) on your phone and sign in.
-2. Open `http://<server-name>:8080` in your phone's browser.
-3. Bookmark it — the URL never changes because Tailscale keeps the overlay IP stable.
-
-The app is a responsive SPA and works on mobile browsers without any native app required.
+The app will be available at `http://localhost:8080`.
 
 ---
 
@@ -158,13 +105,9 @@ mcp/
   content_tool_mcp.py  # MCP server (FastMCP + httpx)
   pyproject.toml       # Python project config
   uv.lock              # Dependency lockfile
-scripts/
-  deploy.sh            # Server-side deploy helper
 .github/workflows/
   ci.yml               # Build & test on every PR
-  deploy.yml           # Auto-deploy to server on push to main
 Dockerfile             # Multi-stage Go + frontend image
 docker-compose.yml     # Local development
-docker-compose.prod.yml # Production overrides
 .env.example           # Environment variable template
 ```
