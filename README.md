@@ -70,6 +70,20 @@ The server runs over stdio and is configured via `.mcp.json` at the project root
 | `tweak_draft` | Revise content with a natural language instruction |
 | `get/save_settings` | Configure LLM provider, model, and API key |
 
+## Running with Docker
+
+```bash
+# Create a local .env from the template
+cp .env.example backend/.env
+
+# Build and start
+docker compose up --build
+```
+
+The app will be available at `http://localhost:8080`.
+
+---
+
 ## Project Structure
 
 ```
@@ -91,4 +105,9 @@ mcp/
   content_tool_mcp.py  # MCP server (FastMCP + httpx)
   pyproject.toml       # Python project config
   uv.lock              # Dependency lockfile
+.github/workflows/
+  ci.yml               # Build & test on every PR
+Dockerfile             # Multi-stage Go + frontend image
+docker-compose.yml     # Local development
+.env.example           # Environment variable template
 ```

@@ -1,0 +1,30 @@
+# Version control
+.git
+.github
+
+# Backend build artifacts
+backend/main
+backend/server
+backend/data/
+
+# Python / MCP
+mcp/.venv
+mcp/__pycache__
+mcp/dist
+mcp/build
+mcp/*.egg-info
+
+# Environment files (never bake secrets into images)
+.env
+.env.*
+backend/.env
+backend/.env.*
+
+# OS / editor
+.DS_Store
+*.swp
+*.swo
+
+# Docs / scripts (not needed in the image)
+README.md
+scripts/
