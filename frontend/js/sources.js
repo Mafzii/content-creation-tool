@@ -15,6 +15,8 @@ export async function loadSources() {
       else if (s.type === 'file' && s.raw) secondary += ': ' + s.raw;
       else if (s.raw) secondary += ': ' + s.raw.slice(0, 60);
 
+      if (s.extract_mode === 'ai') secondary += ' [AI]';
+
       const item = makeItem(
         { primary: s.name, secondary, badge: s.status || 'ready' },
         () => deleteEntity('sources', s.id, loadSources),
@@ -45,6 +47,7 @@ export async function loadSources() {
         const metaEl = item.querySelector('.item-meta');
         if (metaEl) {
           metaEl.innerHTML = `url: <a href="${esc(s.raw)}" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:underline">${esc(s.raw.slice(0, 50))}</a>`;
+          if (s.extract_mode === 'ai') metaEl.innerHTML += ' <span style="color:var(--muted)">[AI]</span>';
         }
       }
 
@@ -59,7 +62,7 @@ export function pollSourceStatus(sourceId, onReady) {
   const interval = setInterval(async () => {
     try {
       const data = await apiFetch(`/sources/${sourceId}/status`);
-      if (data.status === 'ready' || data.status === 'error') {
+      if (data.status === 'ready' || data.status === 'error' || data.status === 'partial') {
         clearInterval(interval);
         onReady();
       }
@@ -76,23 +79,31 @@ export function updateSourceRawLabel() {
   const rawField = document.getElementById('source-raw-field');
   const fileField = document.getElementById('source-file-field');
   const contentField = document.getElementById('source-content-field');
+  const extractModeField = document.getElementById('source-extract-mode-field');
+  const topicField = document.getElementById('source-topic-field');
 
   if (type === 'url') {
     rawField.style.display = '';
     fileField.style.display = 'none';
     contentField.style.display = 'none';
+    extractModeField.style.display = '';
     lbl.textContent = 'URL';
     inp.placeholder = 'https://...';
     inp.style.minHeight = '38px';
     inp.rows = 1;
+    updateTopicFieldVisibility();
   } else if (type === 'file') {
     rawField.style.display = 'none';
     fileField.style.display = '';
     contentField.style.display = 'none';
+    extractModeField.style.display = 'none';
+    topicField.style.display = 'none';
   } else {
     rawField.style.display = '';
     fileField.style.display = 'none';
     contentField.style.display = '';
+    extractModeField.style.display = 'none';
+    topicField.style.display = 'none';
     lbl.textContent = 'Content';
     inp.placeholder = 'Paste your source text here…';
     inp.style.minHeight = '100px';
@@ -100,8 +111,36 @@ export function updateSourceRawLabel() {
   }
 }
 
+function updateTopicFieldVisibility() {
+  const topicField = document.getElementById('source-topic-field');
+  const selectedMode = document.querySelector('input[name="extract_mode"]:checked');
+  if (selectedMode && selectedMode.value === 'ai') {
+    topicField.style.display = '';
+  } else {
+    topicField.style.display = 'none';
+  }
+}
+
+export function populateSourceTopicSelect() {
+  const sel = document.getElementById('source-topic-select');
+  const current = sel.value;
+  sel.innerHTML = '<option value="0">-- none --</option>';
+  state.topicsCache.forEach(t => {
+    const opt = document.createElement('option');
+    opt.value = t.id;
+    opt.textContent = t.name;
+    sel.appendChild(opt);
+  });
+  if (current) sel.value = current;
+}
+
 export function initSourceForm() {
   document.getElementById('source-type-select').addEventListener('change', updateSourceRawLabel);
+
+  // Listen for extract mode radio changes
+  document.querySelectorAll('input[name="extract_mode"]').forEach(radio => {
+    radio.addEventListener('change', updateTopicFieldVisibility);
+  });
 
   document.getElementById('form-sources').addEventListener('submit', async e => {
     e.preventDefault();
@@ -128,6 +167,12 @@ export function initSourceForm() {
         let content = fd.get('content') || '';
         if (type === 'text' && !content) content = raw;
         const body = { name: fd.get('name') || '', type, raw, content };
+
+        if (type === 'url') {
+          body.extract_mode = fd.get('extract_mode') || 'standard';
+          body.topic_id = parseInt(fd.get('source_topic_id') || '0', 10);
+        }
+
         res = await fetch(state.API + '/sources', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -142,14 +187,20 @@ export function initSourceForm() {
         await loadSources();
 
         if (type === 'url') {
-          showNotice('sources', 'Source created. Fetching URL content…', 'success');
+          const modeLabel = created.extract_mode === 'ai' ? 'AI extracting' : 'Fetching';
+          showNotice('sources', `Source created. ${modeLabel} URL content…`, 'success');
           const statusEl = document.getElementById('source-fetch-status');
           statusEl.style.display = 'block';
-          statusEl.textContent = 'Fetching URL content…';
+          statusEl.textContent = `${modeLabel} URL content…`;
           pollSourceStatus(created.id, async () => {
             statusEl.style.display = 'none';
             await loadSources();
-            showNotice('sources', 'URL content fetched.', 'success');
+            const src = state.sourcesCache.find(s => s.id === created.id);
+            if (src && src.status === 'partial') {
+              showNotice('sources', 'URL fetched but AI extraction failed. Raw content was used instead.', 'error');
+            } else {
+              showNotice('sources', 'URL content fetched.', 'success');
+            }
           });
         } else {
           showNotice('sources', 'Created successfully.', 'success');

@@ -35,18 +35,28 @@ func TestMain(m *testing.M) {
 
 	ddl := `
 CREATE TABLE topics (
-	id   INTEGER PRIMARY KEY AUTOINCREMENT,
-	name TEXT NOT NULL
+	id          INTEGER PRIMARY KEY AUTOINCREMENT,
+	name        TEXT NOT NULL,
+	description TEXT NOT NULL DEFAULT '',
+	keywords    TEXT NOT NULL DEFAULT ''
 );
 CREATE TABLE sources (
-	id   INTEGER PRIMARY KEY AUTOINCREMENT,
-	name TEXT NOT NULL,
-	url  TEXT NOT NULL
+	id           INTEGER PRIMARY KEY AUTOINCREMENT,
+	name         TEXT NOT NULL,
+	url          TEXT NOT NULL DEFAULT '',
+	type         TEXT NOT NULL DEFAULT 'text',
+	raw          TEXT NOT NULL DEFAULT '',
+	content      TEXT NOT NULL DEFAULT '',
+	status       TEXT NOT NULL DEFAULT 'ready',
+	extract_mode TEXT NOT NULL DEFAULT 'standard',
+	topic_id     INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE styles (
-	id     INTEGER PRIMARY KEY AUTOINCREMENT,
-	name   TEXT NOT NULL,
-	prompt TEXT NOT NULL
+	id      INTEGER PRIMARY KEY AUTOINCREMENT,
+	name    TEXT NOT NULL,
+	prompt  TEXT NOT NULL,
+	tone    TEXT NOT NULL DEFAULT '',
+	example TEXT NOT NULL DEFAULT ''
 );
 CREATE TABLE drafts (
 	id       INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -54,7 +64,13 @@ CREATE TABLE drafts (
 	content  TEXT NOT NULL DEFAULT '',
 	topic_id INTEGER NOT NULL REFERENCES topics(id) ON DELETE RESTRICT,
 	style_id INTEGER NOT NULL REFERENCES styles(id) ON DELETE RESTRICT,
-	status   TEXT NOT NULL DEFAULT 'draft'
+	status   TEXT NOT NULL DEFAULT 'draft',
+	notes    TEXT NOT NULL DEFAULT ''
+);
+CREATE TABLE draft_sources (
+	draft_id  INTEGER NOT NULL REFERENCES drafts(id) ON DELETE CASCADE,
+	source_id INTEGER NOT NULL REFERENCES sources(id) ON DELETE CASCADE,
+	PRIMARY KEY (draft_id, source_id)
 );`
 	if _, err := testDB.Exec(ddl); err != nil {
 		fmt.Fprintf(os.Stderr, "migration: %v\n", err)
@@ -180,7 +196,7 @@ func TestSourcesCRUD(t *testing.T) {
 	srv := httptest.NewServer(setupMux())
 	defer srv.Close()
 
-	body, _ := json.Marshal(models.Source{Name: "wiki", Url: "https://wiki.org"})
+	body, _ := json.Marshal(models.Source{Name: "wiki", Type: "text", Raw: "some content"})
 	resp, err := http.Post(srv.URL+"/sources", "application/json", bytes.NewReader(body))
 	if err != nil {
 		t.Fatalf("POST /sources: %v", err)
@@ -192,7 +208,7 @@ func TestSourcesCRUD(t *testing.T) {
 	json.NewDecoder(resp.Body).Decode(&created)
 	resp.Body.Close()
 
-	if created.Id == 0 || created.Name != "wiki" || created.Url != "https://wiki.org" {
+	if created.Id == 0 || created.Name != "wiki" {
 		t.Errorf("POST /sources: got %+v", created)
 	}
 

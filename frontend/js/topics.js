@@ -2,6 +2,7 @@ import { apiFetch } from './api.js';
 import { showNotice, makeItem, renderList } from './ui.js';
 import * as state from './state.js';
 import { populateTopicSelects } from './dropdowns.js';
+import { populateSourceTopicSelect } from './sources.js';
 import { deleteEntity } from './forms.js';
 import { openEditModal } from './edit-modal.js';
 
@@ -16,5 +17,6 @@ export async function loadTopics() {
     ));
     renderList('list-topics', items);
     populateTopicSelects();
+    populateSourceTopicSelect();
   } catch (e) { showNotice('topics', e.message); }
 }
