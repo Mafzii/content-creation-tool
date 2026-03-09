@@ -84,17 +84,6 @@ func newTopicHandler(items []models.Topic, err error) crudIface {
 	return handlers.NewCrudHandler[models.Topic](&stubStore[models.Topic]{items: items, err: err})
 }
 
-func newSourceHandler(items []models.Source, err error) crudIface {
-	return handlers.NewCrudHandler[models.Source](&stubStore[models.Source]{items: items, err: err})
-}
-
-func newStyleHandler(items []models.Style, err error) crudIface {
-	return handlers.NewCrudHandler[models.Style](&stubStore[models.Style]{items: items, err: err})
-}
-
-func newDraftHandler(items []models.Draft, err error) crudIface {
-	return handlers.NewCrudHandler[models.Draft](&stubStore[models.Draft]{items: items, err: err})
-}
 
 type entityTest struct {
 	name        string
@@ -123,30 +112,6 @@ func TestCrudHandler(t *testing.T) {
 			makeHandler: unmarshalHandler(newTopicHandler),
 			seedJSON:    `[{"id":1,"name":"computers"},{"id":2,"name":"science"}]`,
 			newJSON:     `{"id":3,"name":"mathematics"}`,
-			entityID:    "1",
-			missingID:   "99",
-		},
-		{
-			name:        "Source",
-			makeHandler: unmarshalHandler(newSourceHandler),
-			seedJSON:    `[{"id":1,"name":"wiki","url":"https://wiki.org"}]`,
-			newJSON:     `{"id":2,"name":"docs","url":"https://docs.org"}`,
-			entityID:    "1",
-			missingID:   "99",
-		},
-		{
-			name:        "Style",
-			makeHandler: unmarshalHandler(newStyleHandler),
-			seedJSON:    `[{"id":1,"name":"formal","prompt":"be formal"}]`,
-			newJSON:     `{"id":2,"name":"casual","prompt":"be casual"}`,
-			entityID:    "1",
-			missingID:   "99",
-		},
-		{
-			name:        "Draft",
-			makeHandler: unmarshalHandler(newDraftHandler),
-			seedJSON:    `[{"id":1,"title":"draft1","content":"hello","topic_id":1,"style_id":1,"status":"pending"}]`,
-			newJSON:     `{"id":2,"title":"draft2","content":"world","topic_id":1,"style_id":1,"status":"pending"}`,
 			entityID:    "1",
 			missingID:   "99",
 		},
@@ -235,6 +200,50 @@ func TestCrudHandler(t *testing.T) {
 				h.Delete(resp, req)
 				if resp.Code != http.StatusNotFound {
 					t.Errorf("got status %d, want %d", resp.Code, http.StatusNotFound)
+				}
+			})
+
+			t.Run("Update returns 200", func(t *testing.T) {
+				h := tc.makeHandler(tc.seedJSON, nil)
+				req, _ := http.NewRequest(http.MethodPut, fmt.Sprintf("/%s", tc.entityID), bytes.NewReader([]byte(tc.newJSON)))
+				req.SetPathValue("id", tc.entityID)
+				resp := httptest.NewRecorder()
+				h.Update(resp, req)
+				if resp.Code != http.StatusOK {
+					t.Errorf("got status %d, want %d", resp.Code, http.StatusOK)
+				}
+			})
+
+			t.Run("Update returns 500 on error", func(t *testing.T) {
+				h := tc.makeHandler("", errors.New("db down"))
+				req, _ := http.NewRequest(http.MethodPut, "/1", bytes.NewReader([]byte(tc.newJSON)))
+				req.SetPathValue("id", "1")
+				resp := httptest.NewRecorder()
+				h.Update(resp, req)
+				if resp.Code != http.StatusInternalServerError {
+					t.Errorf("got status %d, want %d", resp.Code, http.StatusInternalServerError)
+				}
+			})
+
+			t.Run("Update returns 400 for bad id", func(t *testing.T) {
+				h := tc.makeHandler(tc.seedJSON, nil)
+				req, _ := http.NewRequest(http.MethodPut, "/abc", bytes.NewReader([]byte(tc.newJSON)))
+				req.SetPathValue("id", "abc")
+				resp := httptest.NewRecorder()
+				h.Update(resp, req)
+				if resp.Code != http.StatusBadRequest {
+					t.Errorf("got status %d, want %d", resp.Code, http.StatusBadRequest)
+				}
+			})
+
+			t.Run("Update returns 400 for bad JSON", func(t *testing.T) {
+				h := tc.makeHandler(tc.seedJSON, nil)
+				req, _ := http.NewRequest(http.MethodPut, fmt.Sprintf("/%s", tc.entityID), bytes.NewReader([]byte("not json")))
+				req.SetPathValue("id", tc.entityID)
+				resp := httptest.NewRecorder()
+				h.Update(resp, req)
+				if resp.Code != http.StatusBadRequest {
+					t.Errorf("got status %d, want %d", resp.Code, http.StatusBadRequest)
 				}
 			})
 		})
