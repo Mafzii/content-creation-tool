@@ -1,6 +1,16 @@
 const STORAGE_KEY = 'cct_form_drafts';
+const SAVE_DEBOUNCE_MS = 300;
 
 let trackedForms = [];
+
+function debounce(fn, delay) {
+  let timer = null;
+  return function (...args) {
+    const context = this;
+    clearTimeout(timer);
+    timer = setTimeout(() => fn.apply(context, args), delay);
+  };
+}
 
 function getAllFormData() {
   const saved = {};
@@ -34,6 +44,8 @@ function saveAll() {
     localStorage.removeItem(STORAGE_KEY);
   }
 }
+
+const debouncedSaveAll = debounce(saveAll, SAVE_DEBOUNCE_MS);
 
 function restoreForm(id, form) {
   const raw = localStorage.getItem(STORAGE_KEY);
@@ -86,7 +98,7 @@ export function trackForm(id, form) {
   trackedForms.push({ id, form });
   restoreForm(id, form);
 
-  form.addEventListener('input', saveAll);
+  form.addEventListener('input', debouncedSaveAll);
   form.addEventListener('change', saveAll);
 
   const origReset = form.reset.bind(form);
