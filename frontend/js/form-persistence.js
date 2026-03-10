@@ -95,6 +95,7 @@ export function hasUnsavedForms() {
 }
 
 export function trackForm(id, form) {
+  if (!form) return;
   trackedForms.push({ id, form });
   restoreForm(id, form);
 
