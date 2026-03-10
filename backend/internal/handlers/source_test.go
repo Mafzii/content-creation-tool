@@ -6,12 +6,15 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 )
 
 type stubSourceCRUDStore struct {
+	mu      sync.Mutex
 	items   map[int]models.Source
 	nextID  int
 	err     error
@@ -26,9 +29,15 @@ func newStubSourceCRUDStore() *stubSourceCRUDStore {
 	}
 }
 
-func (s *stubSourceCRUDStore) GetAll() ([]models.Source, error) { return nil, s.err }
+func (s *stubSourceCRUDStore) GetAll() ([]models.Source, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return nil, s.err
+}
 
 func (s *stubSourceCRUDStore) Get(id int) (models.Source, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if s.err != nil {
 		return models.Source{}, s.err
 	}
@@ -40,6 +49,8 @@ func (s *stubSourceCRUDStore) Get(id int) (models.Source, error) {
 }
 
 func (s *stubSourceCRUDStore) Create(item models.Source) (models.Source, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if s.err != nil {
 		return models.Source{}, s.err
 	}
@@ -49,16 +60,35 @@ func (s *stubSourceCRUDStore) Create(item models.Source) (models.Source, error) 
 	return item, nil
 }
 
+// Update applies the change to s.items and records the first update per ID in
+// s.updated. Only the first update is recorded so that the synchronous handler
+// update (e.g. setting "pending" status) is captured rather than any subsequent
+// write from a background goroutine.
 func (s *stubSourceCRUDStore) Update(id int, item models.Source) (models.Source, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if s.err != nil {
 		return models.Source{}, s.err
 	}
 	s.items[id] = item
-	s.updated[id] = item
+	if _, alreadyRecorded := s.updated[id]; !alreadyRecorded {
+		s.updated[id] = item
+	}
 	return item, nil
 }
 
-func (s *stubSourceCRUDStore) Delete(id int) error { return s.err }
+func (s *stubSourceCRUDStore) Delete(id int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.err
+}
+
+// getUpdated safely returns the first-recorded update for the given ID.
+func (s *stubSourceCRUDStore) getUpdated(id int) models.Source {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.updated[id]
+}
 
 func makeSourceHandler(store *stubSourceCRUDStore) *handlers.SourceHandler {
 	return handlers.NewSourceHandler(store)
@@ -114,13 +144,18 @@ func TestSourceHandler_Create(t *testing.T) {
 	})
 
 	t.Run("url source gets pending status", func(t *testing.T) {
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			fmt.Fprintln(w, "<html><body><p>Test content</p></body></html>")
+		}))
+		defer ts.Close()
+
 		store := newStubSourceCRUDStore()
 		h := makeSourceHandler(store)
 
 		body, _ := json.Marshal(map[string]string{
 			"name": "wiki",
 			"type": "url",
-			"raw":  "https://example.com",
+			"raw":  ts.URL,
 		})
 		req := httptest.NewRequest(http.MethodPost, "/sources", bytes.NewReader(body))
 		resp := httptest.NewRecorder()
@@ -193,8 +228,13 @@ func TestSourceHandler_Fetch(t *testing.T) {
 	})
 
 	t.Run("sets pending and clears content for url source", func(t *testing.T) {
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			fmt.Fprintln(w, "<html><body><p>Test content</p></body></html>")
+		}))
+		defer ts.Close()
+
 		store := newStubSourceCRUDStore()
-		store.items[1] = models.Source{Id: 1, Type: "url", Raw: "https://example.com", Status: "ready", Content: "old content"}
+		store.items[1] = models.Source{Id: 1, Type: "url", Raw: ts.URL, Status: "ready", Content: "old content"}
 		h := makeSourceHandler(store)
 
 		req := httptest.NewRequest(http.MethodPost, "/sources/1/fetch", nil)
@@ -206,7 +246,7 @@ func TestSourceHandler_Fetch(t *testing.T) {
 			t.Fatalf("status = %d, want %d", resp.Code, http.StatusOK)
 		}
 
-		updated := store.updated[1]
+		updated := store.getUpdated(1)
 		if updated.Status != "pending" {
 			t.Errorf("status = %q, want %q", updated.Status, "pending")
 		}
