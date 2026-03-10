@@ -38,7 +38,6 @@ trackForm('form-topics', document.getElementById('form-topics'));
 trackForm('form-sources', document.getElementById('form-sources'));
 updateSourceRawLabel(); // sync field visibility with restored type value
 trackForm('form-styles', document.getElementById('form-styles'));
-trackForm('form-drafts', document.getElementById('form-drafts'));
 initBeforeUnloadWarning();
 
 // Init
@@ -48,3 +47,6 @@ document.getElementById('tab-topics').classList.add('active');
 
 await Promise.all([loadTopics(), loadStyles()]);
 await Promise.all([loadSources(), loadDrafts()]);
+
+// Restore drafts form after dynamic dropdowns and checkboxes are populated
+trackForm('form-drafts', document.getElementById('form-drafts'));
