@@ -3,6 +3,11 @@ const SAVE_DEBOUNCE_MS = 300;
 
 let trackedForms = [];
 
+function isChanged(el) {
+  if (el.type === 'checkbox' || el.type === 'radio') return el.checked !== el.defaultChecked;
+  return el.value !== el.defaultValue;
+}
+
 function debounce(fn, delay) {
   let timer = null;
   return function (...args) {
@@ -23,12 +28,12 @@ function getAllFormData() {
         // collect checked checkboxes into array
         if (!data[el.name]) data[el.name] = [];
         if (el.checked) data[el.name].push(el.value);
-        if (el.checked) hasValue = true;
+        if (isChanged(el)) hasValue = true;
       } else if (el.type === 'file') {
         continue; // can't persist file inputs
       } else {
         data[el.name] = el.value;
-        if (el.value) hasValue = true;
+        if (isChanged(el)) hasValue = true;
       }
     }
     if (hasValue) saved[id] = data;
@@ -84,11 +89,7 @@ export function hasUnsavedForms() {
   for (const { form } of trackedForms) {
     for (const el of form.elements) {
       if (!el.name || el.type === 'file') continue;
-      if (el.type === 'checkbox') {
-        if (el.checked) return true;
-      } else if (el.value) {
-        return true;
-      }
+      if (isChanged(el)) return true;
     }
   }
   return false;
