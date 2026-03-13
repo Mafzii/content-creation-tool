@@ -123,6 +123,8 @@ async def create_source(
     type: str,
     raw: str,
     content: str = "",
+    extract_mode: str = "standard",
+    topic_id: int = 0,
 ) -> dict | list | str:
     """Create a new content source (text or URL).
 
@@ -135,12 +137,16 @@ async def create_source(
         type: Either "text" or "url"
         raw: The text content or URL
         content: Pre-extracted content (optional, mainly for text sources)
+        extract_mode: "standard" for raw extraction, "ai" to summarize via LLM (URL only)
+        topic_id: Optional topic ID for context-aware AI extraction
     """
     return await _request("POST", "/sources", json={
         "name": name,
         "type": type,
         "raw": raw,
         "content": content,
+        "extract_mode": extract_mode,
+        "topic_id": topic_id,
     })
 
 

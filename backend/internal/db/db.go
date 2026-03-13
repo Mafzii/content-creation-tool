@@ -42,6 +42,7 @@ func runMigration(db *sql.DB) error {
 	migrations := []string{
 		"migrations/001_initial_schema.sql",
 		"migrations/002_llm_support.sql",
+		"migrations/003_ai_extract.sql",
 	}
 	for _, path := range migrations {
 		ddl, err := os.ReadFile(path)

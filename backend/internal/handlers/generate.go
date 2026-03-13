@@ -43,7 +43,12 @@ func NewGenerateHandler(
 }
 
 func (h *GenerateHandler) buildClient() (llm.Client, error) {
-	cfg, err := h.settings.GetAll()
+	return BuildLLMClient(h.settings)
+}
+
+// BuildLLMClient creates an LLM client from stored settings.
+func BuildLLMClient(settings settingsStoreIface) (llm.Client, error) {
+	cfg, err := settings.GetAll()
 	if err != nil {
 		return nil, err
 	}
